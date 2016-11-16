@@ -133,7 +133,7 @@ def getScore(Graph,Node1,Node2,key):
 TrainGraph = Graph
 TestGraph = Graph
 
-def PredictKey(Graph,key):
+def PredictKey(Graph,key,limit):
     for EI in Graph.Edges():
         src = EI.GetSrcNId()
         dest = EI.GetDstNId()
@@ -144,6 +144,9 @@ def PredictKey(Graph,key):
             TestGraph.DelEdge(src,dest)
 
     pairs = []
+    n = 0
+    lowest = 0
+    scores = []
     print Graph.GetNodes(), Graph.GetEdges()
     for Node1 in TrainGraph.Nodes():
         n1 = Node1.GetId()
@@ -156,25 +159,37 @@ def PredictKey(Graph,key):
                 continue
             #print n1,n2
             score = getScore(TrainGraph,Node1,Node2,key)
-            pairs.append( [(n1,n2),score] )
+            if n < limit:
+                pairs.append( [score,(n1,n2)] )
+                scores.append(score)
+                lowest = min(lowest,score)
+                n += 1
+            else:
+                if score > lowest:
+                    lowestloc = np.argmin(scores)
+                    pairs[lowestloc] = [score,(n1,n2)]
+                    scores[lowestloc] = score
+                    lowest = min(scores)
+                    
+                
 
-    pairs.sort(key=lambda x: -x[1])
+    pairs.sort(key=lambda x: -x[0])
 
     nTrue = 0
     for i in range(100):
 
         print pairs[i]
-        if TestGraph.IsEdge(pairs[i][0][0],pairs[i][0][1]):
+        if TestGraph.IsEdge(pairs[i][1][0],pairs[i][1][1]):
             nTrue += 1
             
     return nTrue
 
 
 
-print PredictKey(Graph,1)
-print PredictKey(Graph,2)
-print PredictKey(Graph,3)
-print PredictKey(Graph,4)
+print PredictKey(Graph,1,100)
+#print PredictKey(Graph,2,100)
+print PredictKey(Graph,3,100)
+print PredictKey(Graph,4,100)
     
     
     
