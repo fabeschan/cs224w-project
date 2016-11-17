@@ -1,27 +1,7 @@
 import snap
 import parser
 import pickle
-
-def make_graph(data, categories=None):
-    if categories is None:
-        categories = data.categories
-
-    edges = []
-    for vid, entry in data.lookup.items():
-        if entry.category not in categories:
-            continue
-        for rid in entry.related:
-            if rid in data.lookup and data.lookup[rid].category in categories:
-                edges.append((data.nodeid[vid], data.nodeid[rid]))
-
-    graph = snap.TNGraph.New(len(data.nodeid), len(edges))
-    for nid in data.videoid:
-        graph.AddNode(nid)
-
-    for src_id, dst_id in edges:
-        graph.AddEdge(src_id, dst_id)
-
-    return graph
+import make_graphs
 
 def save_graph_data(data, graph, prefix):
     snap.SaveEdgeList(graph, prefix + '-graph.txt')
@@ -55,7 +35,7 @@ if __name__ == '__main__':
 
 filenames = [ "0301/{}.txt".format(i) for i in range(0, 3) ]
 data = parser.Data(filenames)
-graph = make_graph(data)
+graph = make_graphs.make_graph(data)
 Graph = snap.ConvertGraph(snap.PUNGraph, graph)
 
 GraphClustCoeff = snap.GetClustCf (Graph, -1)
@@ -63,7 +43,7 @@ GraphClustCoeff = snap.GetClustCf (Graph, -1)
 print "Average clustering coefficient of the graph is ", GraphClustCoeff
 
 for category in data.categories:
-    graph1 = make_graph(data,[category])
+    graph1 = make_graphs.make_graph(data,[category])
     Graph1 = snap.ConvertGraph(snap.PUNGraph, graph1)
     print category, Graph1.GetNodes(), Graph1.GetEdges()
     GraphClustCoeff1 = snap.GetClustCf (Graph1, -1)
