@@ -104,7 +104,7 @@ class Data(object):
 
                     
                     
-filenames = [ "0301/{}.txt".format(i) for i in range(0, 2) ]
+filenames = [ "0301/{}.txt".format(i) for i in range(0, 4) ]
 data = Data(filenames)
 graph = make_graph(data)
 Graph = snap.ConvertGraph(snap.PUNGraph, graph)
@@ -186,7 +186,7 @@ def PredictKey(Graph,key,limit):
 
 
 
-print PredictKey(Graph,1,100)
+print PredictKey(snap.GetRndESubGraph(Graph, 10000),1,100)
 #print PredictKey(Graph,2,100)
 print PredictKey(Graph,3,100)
 print PredictKey(Graph,4,100)

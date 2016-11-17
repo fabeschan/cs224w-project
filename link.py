@@ -105,8 +105,9 @@ class Data(object):
 filenames = [ "0301/{}.txt".format(i) for i in range(0, 3) ]
 data = Data(filenames)
 graph = make_graph(data)
+save_graph_data(data, graph, "try")
+data,graph = load_graph_data("try")
 Graph = snap.ConvertGraph(snap.PUNGraph, graph)
-
 
 # PageRanks
 

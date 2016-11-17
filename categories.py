@@ -127,9 +127,12 @@ class Data(object):
 
                     
                     
-filenames = [ "0301/{}.txt".format(i) for i in range(0, 3) ]
+filenames = [ "0301/{}.txt".format(i) for i in range(0, 4) ]
 data = Data(filenames)
 graph = make_graph(data)
+Graph = snap.ConvertGraph(snap.PUNGraph, graph)
+save_graph_data(data, graph, "try")
+data,graph = load_graph_data("try")
 Graph = snap.ConvertGraph(snap.PUNGraph, graph)
 
 GraphClustCoeff = snap.GetClustCf (Graph, -1)
@@ -138,8 +141,20 @@ print "Average clustering coefficient of the graph is ", GraphClustCoeff
 
 for category in data.categories:
     graph1 = make_graph_categories(data,[category])
+    save_graph_data(data, graph1, "temp")
+    data,graph1 = load_graph_data("emp")
     Graph1 = snap.ConvertGraph(snap.PUNGraph, graph1)
     print category, Graph1.GetNodes(), Graph1.GetEdges()
     GraphClustCoeff1 = snap.GetClustCf (Graph1, -1)
     print "Average clustering coefficient of the " +category + " graph is ", GraphClustCoeff1
 
+
+V = Graph.GetNodes()
+E = Graph.GetEdges()
+print V,E
+Erdos = snap.GenRndGnm(snap.PNGraph, V, E)
+print "Erdos CC", snap.GetClustCf(Erdos,-1)
+
+Rnd = snap.TRnd()
+UGraph = snap.GenPrefAttach(V, 20, Rnd)
+print "Pref Attachment CC", snap.GetClustCf(UGraph,-1)
