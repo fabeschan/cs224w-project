@@ -48,25 +48,15 @@ def relabel_subgraph(subgraph):
 
     return new_graph, d
 
-def remove_edges(graph, nid, proportion, removeout=True, removein=False):
+def remove_edges(graph, nid, proportion):
     ''' remove a portion of nid's out edges and return the removed edges '''
     out_neighbors = [ id for id in graph.GetNI(nid).GetOutEdges() ]
     out_removed = random.sample(out_neighbors, int(proportion * len(out_neighbors)))
-
-    in_neighbors = [ id for id in graph.GetNI(nid).GetInEdges() ]
-    in_removed = random.sample(in_neighbors, int(proportion * len(in_neighbors)))
-
     removed = []
-    if removeout:
-        for r in out_removed:
-            graph.DelEdge(nid, r)
-        removed += out_removed
-        print 'removed [{}] out edges'.format(len(out_removed))
-    if removein:
-        for r in in_removed:
-            graph.DelEdge(r, nid)
-        removed += in_removed
-        print 'removed [{}] in edges'.format(len(in_removed))
+    for r in out_removed:
+        graph.DelEdge(nid, r)
+    removed += out_removed
+    print 'removed [{}] out edges'.format(len(out_removed))
     return removed
 
 def score(predicted, truth):
@@ -81,7 +71,7 @@ if __name__ == '__main__':
     data = parser.Data(filenames)
     graph = make_graph(data)
 
-    ROOT = 8
+    ROOT = 2
 
     subg = subgraph(graph, root=ROOT, depth=4)
     print 'num nodes and edges of subgraph:', subg.GetNodes(), subg.GetEdges()
@@ -90,7 +80,7 @@ if __name__ == '__main__':
     graph, labels = relabel_subgraph(subg)
 
     # remove a portion of ROOT's edges
-    removed_edges = remove_edges(graph, ROOT, 0.1, True, True)
+    removed_edges = remove_edges(graph, ROOT, 0.4)
 
     # set up feature extractor
     fx = features.FeatureExtractor(labels, data)
@@ -101,7 +91,7 @@ if __name__ == '__main__':
 
     # set up initial p and w
     p = np.zeros([graph.GetNodes()])
-    p[ROOT] = 1.0
+    p[ROOT+3] = 1.0
     w = np.random.normal(size=[fx.NUM_FEATURES])
 
     for i in range(200):
