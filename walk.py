@@ -71,7 +71,7 @@ if __name__ == '__main__':
     data = parser.Data(filenames)
     graph = make_graph(data)
 
-    ROOT = 2
+    ROOT = 1
 
     subg = subgraph(graph, root=ROOT, depth=4)
     print 'num nodes and edges of subgraph:', subg.GetNodes(), subg.GetEdges()
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     graph, labels = relabel_subgraph(subg)
 
     # remove a portion of ROOT's edges
-    removed_edges = remove_edges(graph, ROOT, 0.4)
+    removed_edges = remove_edges(graph, ROOT, 0.5)
 
     # set up feature extractor
     fx = features.FeatureExtractor(labels, data)
@@ -91,33 +91,42 @@ if __name__ == '__main__':
 
     # set up initial p and w
     p = np.zeros([graph.GetNodes()])
-    p[ROOT+3] = 1.0
+    p[ROOT] = 1.0
     w = np.random.normal(size=[fx.NUM_FEATURES])
+    #p = np.random.normal(size=[graph.GetNodes()])
+    #p = np.abs(transition_matrix.normalize(p))
+    #p[ROOT] = 1.0
+    #p = transition_matrix.normalize(p)
 
+    brk = False
     for i in range(200):
+        #print '=== iter {} ==='.format(i)
         p_new = transition_matrix.pagerank_one_iter(p, w, fm, am)
         w_new = transition_matrix.gradient_descent_step(p, w, fm, am)
 
-        if np.sum(np.abs(w_new - w)) < 10 ** -10 and np.sum(np.abs(p_new - p)) < 10 ** -8:
-            p = p_new
-            w = w_new
-            break
+        if np.sum(np.abs(w_new - w)) < 10 ** -12 and np.sum(np.abs(p_new - p)) < 10 ** -10:
+            brk = True
 
         p = p_new
         w = w_new
-    print 'ran [{}] iterations'.format(i)
+        print 'ran [{}] iterations'.format(i)
 
-    print 'p:', p
-    print 'w:', w
+        #print 'p:', (p)
+        print 'w:', w
 
-    p_enum = [ (p[i], i) for i in range(len(p)) ]
-    p_enum.sort(key=lambda x: x[0], reverse=True)
-    print p_enum
-    print 'compare'
-    p_1 = [ p[1] for p in p_enum ]
-    p_2 = [ p for p in p_1 if not graph.IsEdge(ROOT, p) ]
-    print 'len p_2:', len(p_2)
-    p_3 = p_2[:len(removed_edges)]
-    print 'predicted:', p_3
-    print 'truth:', removed_edges
-    print 'score:', score(p_3, removed_edges)
+        p_enum = [ (p[i], i) for i in range(len(p)) ]
+        p_enum.sort(key=lambda x: x[0], reverse=True)
+        #print p_enum
+        #print 'compare'
+        p_1 = [ e[1] for e in p_enum ]
+        #print 'len p_1:', len(p_1)
+        p_2 = [ e for e in p_1 if not graph.IsEdge(ROOT, e) ]
+        #print 'len p_2:', len(p_2)
+        #print 'p_2:', p_2
+        p_3 = p_2[:len(removed_edges)]
+        print 'predicted:', p_3
+        print 'truth:', removed_edges
+        print 'score:', score(p_3, removed_edges)
+
+        if brk:
+            break
