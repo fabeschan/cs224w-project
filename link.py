@@ -19,8 +19,13 @@ def make_graph(data, categories=None):
             if rid in data.lookup and data.lookup[rid].category in categories:
                 edges.append((data.nodeid[vid], data.nodeid[rid]))
 
-    graph = snap.TNGraph.New(len(data.nodeid), len(edges))
-    for nid in data.videoid:
+    nodeids = set()
+    for src_id, dst_id in edges:
+        nodeids.add(src_id)
+        nodeids.add(dst_id)
+
+    graph = snap.TNGraph.New(len(nodeids), len(edges))
+    for nid in nodeids:
         graph.AddNode(nid)
 
     for src_id, dst_id in edges:
@@ -102,7 +107,7 @@ class Data(object):
 
                     
                     
-filenames = [ "0301/{}.txt".format(i) for i in range(0, 3) ]
+filenames = [ "0301/{}.txt".format(i) for i in range(0, 4) ]
 data = Data(filenames)
 graph = make_graph(data)
 save_graph_data(data, graph, "try")
@@ -178,7 +183,7 @@ def plot(tops, pageranks, key, filename,xlabel):
     plt.xlabel(xlabel)
     plt.ylabel(key)
     plt.title(key + " vs. " +xlabel)
-    plt.plot(x,y, 'ro')
+    plt.plot(x,y,"bo",markersize=2)
     plt.yscale('log')
     plt.xscale('log')
     plt.savefig("plots-links/log"+filename+".png")
