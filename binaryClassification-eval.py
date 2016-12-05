@@ -1,9 +1,3 @@
-'''
-use scikit learn
-the training data will be every pair of nodes, each labeled as edge or no edge (ignore test case data)
-the testing data will be select pairs of nodes (maybe 10% of the top 10 highest degree nodes to other nodes)
-use metadata as training features? (i.e. each possible feature (in category or not) will be 0/1 present or not in feature vector)
-'''
 import snap
 import numpy as np
 from sklearn import linear_model
@@ -11,12 +5,6 @@ import parser # have local parse copy
 
 
 regr = linear_model.LogisticRegression(class_weight='balanced')
-#print "class order"
-#print regr.classes_
-
-# track each possible edge (a, b) where a < b with a unique identifier in some dicitonary
-# for each edge, create numpy array vector of 0/1 for features:
-# uploader(?), age, category, length, views, rate, ratings, comments for each end point
 
 goldLabels = {} # maps edge to -1 if not present or 1 if present
 labels = [] #maps row number to gold label
@@ -52,17 +40,6 @@ numNonEdgeExamples = 0
 userId = {} # maps username to unique id
 userIdNext = 0
 
-# TODO: random subgraph and train on that instead (in 0-4 depth)
-# get probabilities of top 100 edges likely to appear? then check how many of those edges are actually in the test graph? (can do this without iterating over all node pairs?) --> node pairs where nodes have k train in and k test in data set?
-# 		test edges for nodes that have high degree (top 100 high degree nodes (>50 edges in test and train sets))
-# SPlit graph into training/testing data before hand? don't test on any pair that is trained on
-
-# take whole graph and take half edges in test graph and half graph in train graph
-#
-# create own test and train matrix
-
-# Gprime = snap.GetRndESubgraph(G, 1000)
-
 print "Generating feature matrix for training graph..."
 trainNegSet = set() #check if example in pos training set if is edge
 for src in Gtrain.Nodes():
@@ -94,7 +71,6 @@ for src in Gtrain.Nodes():
 			goldLabels[(n1, n2)] = 1
 			labels.append(1)
 		elif numNonEdgeExamples < Gtrain.GetEdges(): #force balance the classes
-		#else:
 			# randomly decide if this negative example will be trained on
 			goldLabels[(n1, n2)] = 0#-1
 			p = np.random.uniform()
@@ -139,9 +115,18 @@ print "Generating test examples where at least k examples in the train set for e
 top100Edges = []
 top100EdgeScores = []
 lowestScore = 0
+top100EdgesNeg = []
+top100EdgeScoresNeg = []
+lowestScoreNeg = 0
+numCorrectPredictions = 0
+numTotalPredctions = 0
 for src in Gtrain.Nodes():
+	#if len(top100Edges) > 2 and len(top100EdgeScores) > 2:
+	#	break
 	n1 = src.GetId()
 	for dest in Gtrain.Nodes():
+		#if len(top100Edges) > 2 and len(top100EdgeScores) > 2:
+		#	break
 		n2 = dest.GetId()
 		if n1 > n2:
 			# enforce src < dest in all edge considerations
@@ -152,7 +137,7 @@ for src in Gtrain.Nodes():
 			continue
 
 		# check if enough edges
-		if src.GetDeg() < 40 or Gtest.GetNI(n1).GetDeg() < 40 or dest.GetDeg() < 40 or Gtest.GetNI(n2).GetDeg() < 40:
+		if src.GetDeg() < 35 or Gtest.GetNI(n1).GetDeg() < 35 or dest.GetDeg() < 35 or Gtest.GetNI(n2).GetDeg() < 35:
 			continue
 
 		newRow = []
@@ -183,9 +168,16 @@ for src in Gtrain.Nodes():
 		newRow.append(userId[data.lookup[destVid][0]])
 
 		X = np.array(newRow)
-		classProbs = regr.predict_proba(X)
+		result = regr.predict(X.reshape(1,-1))
+		numTotalPredctions += 1
+		if (result[0] == 0 and not G.IsEdge(n1,n2)) or (result[0] == 1 and G.IsEdge(n1,n2)):
+			numCorrectPredictions += 1
+
+		classProbs = regr.predict_proba(X.reshape(1,-1))
 		yesEdgeProb = classProbs[0,1]
-		if len(scores) < 100:
+		noEdgeProb = classProbs[0,0]
+
+		if len(top100EdgeScores) < 100:
 			top100Edges.append( [yesEdgeProb, (n1, n2)] )
 			top100EdgeScores.append(yesEdgeProb)
 			lowestScore = min(lowestScore, yesEdgeProb)
@@ -196,15 +188,37 @@ for src in Gtrain.Nodes():
 				top100EdgeScores[lowestLoc] = yesEdgeProb
 				lowestScore = min(top100EdgeScores)
 
+		if len(top100EdgeScoresNeg) < 100:
+			top100EdgesNeg.append( [noEdgeProb, (n1, n2)] )
+			top100EdgeScoresNeg.append(noEdgeProb)
+			lowestScore = min(lowestScoreNeg, noEdgeProb)
+		else:
+			if noEdgeProb > lowestScoreNeg:
+				lowestLoc = np.argmin(top100EdgeScoresNeg)
+				top100EdgesNeg[lowestLoc] = [ noEdgeProb,(n1, n2) ]
+				top100EdgeScoresNeg[lowestLoc] = noEdgeProb
+				lowestScoreNeg = min(top100EdgeScoresNeg)
+
 top100Edges.sort(key=lambda x:-x[0])
+top100EdgesNeg.sort(key=lambda x:-x[0])
 
 numTrue = 0
 for i in xrange(len(top100Edges)):
 	if Gtest.IsEdge(top100Edges[i][1][0],top100Edges[i][1][1]):
 		numTrue += 1
+numTrueNeg = 0
+for i in xrange(len(top100EdgesNeg)):
+	if Gtest.IsEdge(top100EdgesNeg[i][1][0],top100EdgesNeg[i][1][1]):
+		numTrueNeg += 1
 
-print "Test Accuracy: %d"%(numTrue)
+print top100EdgeScores
+print top100EdgeScoresNeg
+print "Test Accuracy (class1): %d"%(numTrue)
+print "Test Accuracy (class0): %d"%(numTrueNeg)
 print "Qualifying Test Cases: %d"%(len(top100EdgeScores))
+
+print "All correct predictions: %d"%(numCorrectPredictions)
+print "Total predictions made: %d"%(numTotalPredctions)
 
 '''
 # The coefficients
