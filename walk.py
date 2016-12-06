@@ -48,15 +48,26 @@ def relabel_subgraph(subgraph):
 
     return new_graph, d
 
-def remove_edges(graph, nid, proportion):
-    ''' remove a portion of nid's out edges and return the removed edges '''
-    out_neighbors = [ id for id in graph.GetNI(nid).GetOutEdges() ]
-    out_removed = random.sample(out_neighbors, int(proportion * len(out_neighbors)))
-    removed = []
-    for r in out_removed:
-        graph.DelEdge(nid, r)
-    removed += out_removed
-    print 'removed [{}] out edges'.format(len(out_removed))
+def remove_edges(graph, p_node, p_edge, min_outdeg=20, override=[]):
+    '''
+    remove a proportion p_edge of out edges from each of proportion p_node nodes
+    and return the removed edges as a dict[nid->removed]
+
+    '''
+    q = [ n.GetId() for n in graph.Nodes() if n.GetOutDeg() >= min_outdeg ]
+    print q
+    removed = {}
+    nodes = random.sample(q, int(p_node * len(q)))
+    if override:
+        nodes = override
+
+    for nid in nodes:
+        out_neighbors = [ id for id in graph.GetNI(nid).GetOutEdges() ]
+        out_removed = random.sample(out_neighbors, int(p_edge * len(out_neighbors)))
+        for r in out_removed:
+            graph.DelEdge(nid, r)
+        removed[nid] = out_removed
+    print 'removed:', removed
     return removed
 
 def score(predicted, truth):
@@ -79,9 +90,6 @@ if __name__ == '__main__':
     # extract subgraph
     graph, labels = relabel_subgraph(subg)
 
-    # remove a portion of ROOT's edges
-    removed_edges = remove_edges(graph, ROOT, 0.5)
-
     # set up feature extractor
     fx = features.FeatureExtractor(labels, data)
 
@@ -89,14 +97,19 @@ if __name__ == '__main__':
     am = adjacency_matrix(graph)
     fm = transition_matrix.feature_matrix(graph, fx)
 
+    nid = ROOT #removed.keys()[0]
+
+    # remove a portion of ROOT's edges
+    removed = remove_edges(graph, p_node=0.05, p_edge=0.2, override=[nid])
+
     # set up initial p and w
     p = np.zeros([graph.GetNodes()])
-    p[ROOT] = 1.0
+    p[nid] = 1.0
     w = np.random.normal(size=[fx.NUM_FEATURES])
-    #p = np.random.normal(size=[graph.GetNodes()])
-    #p = np.abs(transition_matrix.normalize(p))
-    #p[ROOT] = 1.0
-    #p = transition_matrix.normalize(p)
+    p = np.random.normal(size=[graph.GetNodes()])
+    p = np.abs(transition_matrix.normalize(p))
+    p[nid] = 1.0
+    p = transition_matrix.normalize(p)
 
     brk = False
     for i in range(200):
@@ -104,7 +117,7 @@ if __name__ == '__main__':
         p_new = transition_matrix.pagerank_one_iter(p, w, fm, am)
         w_new = transition_matrix.gradient_descent_step(p, w, fm, am)
 
-        if np.sum(np.abs(w_new - w)) < 10 ** -12 and np.sum(np.abs(p_new - p)) < 10 ** -10:
+        if np.sum(np.abs(w_new - w)) < 10 ** -10 and np.sum(np.abs(p_new - p)) < 10 ** -8:
             brk = True
 
         p = p_new
@@ -116,17 +129,15 @@ if __name__ == '__main__':
 
         p_enum = [ (p[i], i) for i in range(len(p)) ]
         p_enum.sort(key=lambda x: x[0], reverse=True)
-        #print p_enum
-        #print 'compare'
         p_1 = [ e[1] for e in p_enum ]
+        p_2 = [ e for e in p_1 if not graph.IsEdge(nid, e) ]
         #print 'len p_1:', len(p_1)
-        p_2 = [ e for e in p_1 if not graph.IsEdge(ROOT, e) ]
         #print 'len p_2:', len(p_2)
         #print 'p_2:', p_2
-        p_3 = p_2[:len(removed_edges)]
+        p_3 = p_2[:len(removed[nid])]
         print 'predicted:', p_3
-        print 'truth:', removed_edges
-        print 'score:', score(p_3, removed_edges)
+        print 'truth:', removed[nid]
+        print 'score:', score(p_3, removed[nid])
 
         if brk:
             break
