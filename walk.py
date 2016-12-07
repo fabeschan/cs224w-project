@@ -2,22 +2,23 @@ import snap
 import parser
 import numpy as np
 import random
-from srw import transition_matrix, features
+from srw import transition_matrix, features, loss_function
 from srw.adjacency_matrix import adjacency_matrix
 from make_graphs import save_graph_data, load_graph_data, make_graph
 
-def bfs(graph, root, depth):
+def bfs(graph, roots, depth):
     nodes = set()
-    for i in range(depth):
-        NodeVec = snap.TIntV()
-        snap.GetNodesAtHop(graph, root, i, NodeVec, False)
-        for x in NodeVec:
-            nodes.add(x)
+    for r in roots:
+        for i in range(depth+1):
+            NodeVec = snap.TIntV()
+            snap.GetNodesAtHop(graph, r, i, NodeVec, False)
+            for x in NodeVec:
+                nodes.add(x)
     return nodes
 
-def subgraph(g, root, depth):
+def subgraph(g, roots, depth):
     NIdV = snap.TIntV()
-    for i in bfs(g, root, depth):
+    for i in bfs(g, roots, depth):
         NIdV.Add(i)
     sg = snap.GetSubGraph(g, NIdV)
     return sg
@@ -25,7 +26,7 @@ def subgraph(g, root, depth):
 def relabel_subgraph(subgraph):
     '''
     construct new subgraph with nodeIDs from 0 to subgraph.GetNodes()
-    return new subgraph and dict[old_nodeID->new_nodeID]
+    return new subgraph and dict[new_nodeID->old_nodeID] and dict[old_nodeID->new_nodeID]
     '''
 
     new_graph = snap.TNGraph.New(subgraph.GetNodes(), subgraph.GetEdges())
@@ -35,7 +36,7 @@ def relabel_subgraph(subgraph):
     size = 0
     for n in subgraph.Nodes():
         nid = n.GetId()
-        if nid not in d:
+        if nid not in q:
             new_id = size
             size += 1
             d[new_id] = nid
@@ -46,7 +47,7 @@ def relabel_subgraph(subgraph):
         src, dst = e.GetSrcNId(), e.GetDstNId()
         new_graph.AddEdge(q[src], q[dst])
 
-    return new_graph, d
+    return new_graph, d, q
 
 def remove_edges(graph, p_node, p_edge, min_outdeg=20, override=[]):
     '''
@@ -55,7 +56,6 @@ def remove_edges(graph, p_node, p_edge, min_outdeg=20, override=[]):
 
     '''
     q = [ n.GetId() for n in graph.Nodes() if n.GetOutDeg() >= min_outdeg ]
-    print q
     removed = {}
     nodes = random.sample(q, int(p_node * len(q)))
     if override:
@@ -67,7 +67,7 @@ def remove_edges(graph, p_node, p_edge, min_outdeg=20, override=[]):
         for r in out_removed:
             graph.DelEdge(nid, r)
         removed[nid] = out_removed
-    print 'removed:', removed
+    #print 'removed:', removed
     return removed
 
 def score(predicted, truth):
@@ -77,18 +77,21 @@ def score(predicted, truth):
             count += 1.0
     return count / len(truth)
 
-if __name__ == '__main__':
-    filenames = [ "0301/{}.txt".format(i) for i in range(0, 4) ]
-    data = parser.Data(filenames)
-    graph = make_graph(data)
+def evaluate(data, graph):
+    #print 'population:', len([ n.GetId() for n in graph.Nodes() if n.GetId() in [60, 41, 37, 66, 9] ])
+    ROOT = random.sample([ n.GetId() for n in graph.Nodes() if n.GetOutDeg() >= 20 ], 1)
 
-    ROOT = 1
-
-    subg = subgraph(graph, root=ROOT, depth=4)
+    subg = subgraph(graph, roots=ROOT, depth=2)
     print 'num nodes and edges of subgraph:', subg.GetNodes(), subg.GetEdges()
 
     # extract subgraph
-    graph, labels = relabel_subgraph(subg)
+    graph, labels, rlabels = relabel_subgraph(subg)
+
+    # remove a portion of ROOT's edges
+    newROOT = rlabels[ROOT[0]]
+    #print [ (n.GetId(), n, n.GetOutDeg()) for n in graph.Nodes() ]
+    removed = remove_edges(graph, p_node=0.05, p_edge=0.2, override=[newROOT])
+    if len(removed[newROOT]) == 0: return None
 
     # set up feature extractor
     fx = features.FeatureExtractor(labels, data)
@@ -97,47 +100,55 @@ if __name__ == '__main__':
     am = adjacency_matrix(graph)
     fm = transition_matrix.feature_matrix(graph, fx)
 
-    nid = ROOT #removed.keys()[0]
-
-    # remove a portion of ROOT's edges
-    removed = remove_edges(graph, p_node=0.05, p_edge=0.2, override=[nid])
-
     # set up initial p and w
     p = np.zeros([graph.GetNodes()])
-    p[nid] = 1.0
+    p[newROOT] = 1.0
     w = np.random.normal(size=[fx.NUM_FEATURES])
-    p = np.random.normal(size=[graph.GetNodes()])
-    p = np.abs(transition_matrix.normalize(p))
-    p[nid] = 1.0
-    p = transition_matrix.normalize(p)
+    #p = np.random.normal(size=[graph.GetNodes()]) * 0.0001
+    #p = np.abs(p)
+    #p[newROOT] = 1.0
+    #p = transition_matrix.normalize(p)
 
     brk = False
     for i in range(200):
         #print '=== iter {} ==='.format(i)
         p_new = transition_matrix.pagerank_one_iter(p, w, fm, am)
-        w_new = transition_matrix.gradient_descent_step(p, w, fm, am)
+        w_new = transition_matrix.gradient_descent_step(p, w, fm, am, removed, newROOT)
 
-        if np.sum(np.abs(w_new - w)) < 10 ** -10 and np.sum(np.abs(p_new - p)) < 10 ** -8:
+        if np.sum(np.abs(w_new - w)) < 10 ** -120 and np.sum(np.abs(p_new - p)) < 10 ** -80:
             brk = True
 
         p = p_new
         w = w_new
-        print 'ran [{}] iterations'.format(i)
+        #print 'ran [{}] iterations'.format(i)
 
+        print 'total loss:', loss_function.total_loss(p, removed, newROOT)
         #print 'p:', (p)
         print 'w:', w
+        #p = transition_matrix.normalize(p)
 
         p_enum = [ (p[i], i) for i in range(len(p)) ]
         p_enum.sort(key=lambda x: x[0], reverse=True)
+        #print p_enum
+        #print 'compare'
         p_1 = [ e[1] for e in p_enum ]
-        p_2 = [ e for e in p_1 if not graph.IsEdge(nid, e) ]
         #print 'len p_1:', len(p_1)
-        #print 'len p_2:', len(p_2)
-        #print 'p_2:', p_2
-        p_3 = p_2[:len(removed[nid])]
+        p_2 = [ e for e in p_1 if not graph.IsEdge(newROOT, e) ]
+        p_3 = p_2[:len(removed[newROOT])]
         print 'predicted:', p_3
-        print 'truth:', removed[nid]
-        print 'score:', score(p_3, removed[nid])
+        print 'truth:', removed[newROOT]
+        print 'score:', score(p_3, removed[newROOT])
 
         if brk:
             break
+    return score(p_3, removed[newROOT])
+
+if __name__ == '__main__':
+    filenames = [ "0301/{}.txt".format(i) for i in range(0, 4) ]
+    data = parser.Data(filenames)
+    graph = make_graph(data)
+    #data, graph = load_graph_data(prefix='test')
+
+    for k in range(1):
+        s = evaluate(data, graph)
+        print 'eval:', s

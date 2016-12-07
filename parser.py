@@ -40,12 +40,17 @@ def extract_fields(line):
 class Data(object):
     def __init__(self, filenames):
         parsed = []
+        nones = []
         for filename in filenames:
             with open(filename, 'r') as f:
                 lines = f.readlines()
 
             # careful: extract_fields can return None so we filter them out
             parsed += filter(lambda x: x is not None, map(extract_fields, lines))
+            nones += filter(lambda x: x is None, map(extract_fields, lines))
+
+        print 'parsed:', len(parsed)
+        print 'nones:', len(nones)
 
         self.size = 0
         self.lookup = { x.videoid: x for x in parsed } # videoid -> fields
@@ -55,11 +60,15 @@ class Data(object):
 
         for x in parsed:
             vid = x.videoid
-            for v in list(x.related) + [vid]:
+            ls = list(x.related) + [vid]
+            for v in ls:
                 if v not in self.nodeid:
                     self.nodeid[v] = self.size
                     self.videoid[self.size] = v
                     self.size += 1
+        print 'size', self.size
+        print 'nodeid', len(self.nodeid.keys())
+        print 'lookup', len(self.lookup)
 
 
 if __name__ == '__main__':
