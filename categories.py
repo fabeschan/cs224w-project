@@ -19,8 +19,13 @@ def make_graph(data, categories=None):
             if rid in data.lookup and data.lookup[rid].category in categories:
                 edges.append((data.nodeid[vid], data.nodeid[rid]))
 
-    graph = snap.TNGraph.New(len(data.nodeid), len(edges))
-    for nid in data.videoid:
+    nodeids = set()
+    for src_id, dst_id in edges:
+        nodeids.add(src_id)
+        nodeids.add(dst_id)
+
+    graph = snap.TNGraph.New(len(nodeids), len(edges))
+    for nid in nodeids:
         graph.AddNode(nid)
 
     for src_id, dst_id in edges:
@@ -28,30 +33,7 @@ def make_graph(data, categories=None):
 
     return graph
     
-def make_graph_categories(data, categories=None):
-    if categories is None:
-        categories = data.categories
 
-    edges = []
-    n = 0
-    for vid, entry in data.lookup.items():
-        if entry.category not in categories:
-            continue
-        n+=1
-        for rid in entry.related:
-            if rid in data.lookup and data.lookup[rid].category in categories:
-                edges.append((data.nodeid[vid], data.nodeid[rid]))
-
-    graph = snap.TNGraph.New(n, len(edges))
-    for nid in data.videoid:
-        #print nid
-        if data.lookup[data.videoid[nid]].category in categories:
-            graph.AddNode(nid)
-
-    for src_id, dst_id in edges:
-        graph.AddEdge(src_id, dst_id)
-
-    return graph
     
 def save_graph_data(data, graph, prefix):
     snap.SaveEdgeList(graph, prefix + '-graph.txt')
@@ -140,9 +122,9 @@ GraphClustCoeff = snap.GetClustCf (Graph, -1)
 print "Average clustering coefficient of the graph is ", GraphClustCoeff
 
 for category in data.categories:
-    graph1 = make_graph_categories(data,[category])
+    graph1 = make_graph(data,[category])
     save_graph_data(data, graph1, "temp")
-    data,graph1 = load_graph_data("emp")
+    data,graph1 = load_graph_data("temp")
     Graph1 = snap.ConvertGraph(snap.PUNGraph, graph1)
     print category, Graph1.GetNodes(), Graph1.GetEdges()
     GraphClustCoeff1 = snap.GetClustCf (Graph1, -1)
