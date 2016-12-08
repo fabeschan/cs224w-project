@@ -5,9 +5,33 @@ import parser # have local parse copy
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from sets import Set
 
 def indicator(x):
 	return 1.0 if x else 0.0
+
+def getScore(Graph,Node1,Node2,key):
+        neigh1 = Set(Node1.GetOutEdges())
+        neigh2 = Set(Node2.GetOutEdges())
+        if key==1: # Common number of neighbours
+                return len(neigh1.intersection(neigh2))
+        if key==2: # Jaccard of sets of neighbours
+                if len(neigh1.union(neigh2)) == 0:
+                        return 0
+                return (len(neigh1.intersection(neigh2)) * 1.0)/len(neigh1.union(neigh2))
+        if key==3: # Preferential Attachment
+                return len(neigh1)*len(neigh2)
+        if key==4: # Adamic/Adar score
+                score = 0.0
+                for z in neigh1.intersection(neigh2):
+                        Node3 = Graph.GetNI(z)
+                        score += 1.0/max(1.0, np.log(len(Set(Node3.GetOutEdges()))))
+                return score
+        #if key==5: # Graph Distance
+        #        return -shortestDist[Node2.GetId()]
+        #if key==6: # PageRank
+        #        return PRankH[Node1.GetId()] + PRankH[Node2.GetId()]
+        return 0
 
 def getFeatureVector(Gtrain, data, n1, n2):
 	srcVid = data.videoid[n1]
@@ -25,6 +49,11 @@ def getFeatureVector(Gtrain, data, n1, n2):
 	newRow.append(100.0/max(1, abs(data.lookup[srcVid][8] - data.lookup[destVid][8]))) #comments
 	newRow.append(indicator(data.lookup[srcVid][1] == data.lookup[destVid][1])) #uploader
 	newRow.append(100.0/max(1, abs(Gtrain.GetNI(n1).GetDeg() - Gtrain.GetNI(n2).GetDeg()))) #training degree
+	newRow.append(getScore(Gtrain, Gtrain.GetNI(n1), Gtrain.GetNI(n2), 1)) # common neighbor score
+	newRow.append(getScore(Gtrain, Gtrain.GetNI(n1), Gtrain.GetNI(n2), 2)) # jaccard score
+	newRow.append(getScore(Gtrain, Gtrain.GetNI(n1), Gtrain.GetNI(n2), 4)) # adamic/adar score
+
+
 	return newRow
 
 def getGoldLabel(G, n1, n2):
@@ -241,6 +270,7 @@ def generateTrainingGraph(testingPercent):
 
 # Constants
 depth = 3
+numTrials = 10
 
 # read in graph twice
 # one will be the gold graph and the other the train graph
@@ -269,8 +299,8 @@ for i in k:
         avgNegPrecC[i] = 0.0
         avgPosRecC[i] = 0.0
         avgPosPrecC[i] = 0.0
-	
-for trial in xrange(10):
+
+for trial in xrange(numTrials):
 	G, Gtrain = generateTrainingGraph(0.2)
 	for i in k:
 		print "---------------------------------> running logreg on core nodes k = %d on trial %d"%(i, trial+1)
@@ -290,10 +320,10 @@ avgNegPrecs = []
 avgPosRecs = []
 avgPosPrecs = []
 for i in k:
-	avgPosPrecs.append(avgPosPrecC[i]/len(k))
-	avgPosRecs.append(avgPosRecC[i]/len(k))
-	avgNegPrecs.append(avgNegPrecC[i]/len(k))
-	avgNegRecs.append(avgNegRecC[i]/len(k))
+	avgPosPrecs.append(avgPosPrecC[i]/numTrials)
+	avgPosRecs.append(avgPosRecC[i]/numTrials)
+	avgNegPrecs.append(avgNegPrecC[i]/numTrials)
+	avgNegRecs.append(avgNegRecC[i]/numTrials)
 
 print k
 print avgPosPrecs
@@ -342,8 +372,9 @@ plt.clf()
 plt.figure()
 plt.plot(trialXaxis, negPrecs, "o", label="indv neg precision")
 plt.plot(trialXaxis, negRecs, "o", label="indv neg recall")
-plt.title("Avg. Positive Precision + Recall")
+plt.title("Negative Precision + Recall by Trial")
 plt.legend()
 plt.xlabel("k values (for core node)")
 plt.ylabel("Precision/Recall")
 plt.savefig("indvNegResults.pdf")
+
