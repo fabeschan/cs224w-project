@@ -143,9 +143,9 @@ def propflow(Graph, root, l):
                 if n3 not in scores:
                     scores[n3]=0.0
                 scores[n3] += flow
-            if n2 not in found:
-                found.append(n2)
-                newSearch.append(n2)
+                if n3 not in found:
+                    found.append(n3)
+                    newSearch.append(n3)
     return scores
     
     
@@ -276,5 +276,5 @@ for ktrain in range(60,20,-5):
     limit = 100
     ktest = ktrain
     print "kTrain/kTest", ktrain,ktest
-    print PredictKey(Graph,limit,ktrain,ktest,20)
+    print PredictKey(Graph,limit,ktrain,ktest,2)
     
