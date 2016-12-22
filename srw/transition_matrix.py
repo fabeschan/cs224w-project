@@ -3,7 +3,8 @@ import loss_function
 import features
 
 def activation_function(x_uv, w):
-    return np.exp(-np.dot(x_uv, w))
+    #return np.exp(-np.dot(x_uv, w))
+    return 1.0 / (1 + np.exp(-np.dot(x_uv, w)))
 
 def feature_matrix(g, fx):
     x = np.zeros((g.GetNodes(), g.GetNodes(), fx.NUM_FEATURES))

@@ -17,6 +17,8 @@ class FeatureExtractor(object):
                 lambda udata, vdata: indicator(udata.uploader == vdata.uploader),
                 lambda udata, vdata: indicator(udata.category == vdata.category),
                 lambda udata, vdata: 100.0 / max(1, abs(udata.age - vdata.age)),
+                #lambda udata, vdata: vdata.views,
+                #lambda udata, vdata: vdata.age,
                 #lambda udata, vdata: 100.0 / max(1, abs(udata.ratings - vdata.ratings)),
                 #lambda udata, vdata: 100.0 / max(1, abs(udata.views - vdata.views)),
                 #lambda udata, vdata: 100.0 / max(1, abs(udata.length - vdata.length)),

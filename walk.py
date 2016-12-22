@@ -70,19 +70,21 @@ def remove_edges(graph, p_node, p_edge, min_outdeg=20, override=[]):
     #print 'removed:', removed
     return removed
 
-def score(predicted, truth):
+def eval_score(predicted, truth, total):
     count = 0.0
     for p in predicted:
         if p in truth:
             count += 1.0
-    return count / len(truth)
+    score = count / len(truth)
+    precision = count / len(predicted)
+    recall = count / len(truth)
+    return score, precision, recall
 
 def evaluate(data, graph):
-    #print 'population:', len([ n.GetId() for n in graph.Nodes() if n.GetId() in [60, 41, 37, 66, 9] ])
     ROOT = random.sample([ n.GetId() for n in graph.Nodes() if n.GetOutDeg() >= 20 ], 1)
 
     subg = subgraph(graph, roots=ROOT, depth=2)
-    print 'num nodes and edges of subgraph:', subg.GetNodes(), subg.GetEdges()
+    #print 'num nodes and edges of subgraph:', subg.GetNodes(), subg.GetEdges()
 
     # extract subgraph
     graph, labels, rlabels = relabel_subgraph(subg)
@@ -104,10 +106,6 @@ def evaluate(data, graph):
     p = np.zeros([graph.GetNodes()])
     p[newROOT] = 1.0
     w = np.random.normal(size=[fx.NUM_FEATURES])
-    #p = np.random.normal(size=[graph.GetNodes()]) * 0.0001
-    #p = np.abs(p)
-    #p[newROOT] = 1.0
-    #p = transition_matrix.normalize(p)
 
     brk = False
     for i in range(200):
@@ -122,26 +120,21 @@ def evaluate(data, graph):
         w = w_new
         #print 'ran [{}] iterations'.format(i)
 
-        print 'total loss:', loss_function.total_loss(p, removed, newROOT)
-        #print 'p:', (p)
-        print 'w:', w
-        #p = transition_matrix.normalize(p)
+        #print 'total loss:', loss_function.total_loss(p, removed, newROOT)
+        #print 'w:', w
 
         p_enum = [ (p[i], i) for i in range(len(p)) ]
         p_enum.sort(key=lambda x: x[0], reverse=True)
-        #print p_enum
-        #print 'compare'
         p_1 = [ e[1] for e in p_enum ]
-        #print 'len p_1:', len(p_1)
         p_2 = [ e for e in p_1 if not graph.IsEdge(newROOT, e) ]
         p_3 = p_2[:len(removed[newROOT])]
-        print 'predicted:', p_3
-        print 'truth:', removed[newROOT]
-        print 'score:', score(p_3, removed[newROOT])
+        #print 'predicted:', p_3
+        #print 'truth:', removed[newROOT]
+        score, precision, recall = eval_score(p_3, removed[newROOT], len(p_2))
 
         if brk:
             break
-    return score(p_3, removed[newROOT])
+    return score, precision, recall
 
 if __name__ == '__main__':
     filenames = [ "0301/{}.txt".format(i) for i in range(0, 4) ]
@@ -150,5 +143,5 @@ if __name__ == '__main__':
     #data, graph = load_graph_data(prefix='test')
 
     for k in range(1):
-        s = evaluate(data, graph)
-        print 'eval:', s
+        s, p, r = evaluate(data, graph)
+        print "{} {} {}".format(s, p, r)

@@ -1,7 +1,7 @@
 import snap
 import parser, make_graphs
 
-filenames = [ "0301/{}.txt".format(i) for i in range(0, 2) ]
+filenames = [ "0301/{}.txt".format(i) for i in range(0, 3) ]
 data = parser.Data(filenames)
 graph = make_graphs.make_graph(data)
 ugraph = snap.ConvertGraph(snap.PUNGraph, graph)
